@@ -76,8 +76,34 @@ func (p *hostPathProvisioner) Provision(ctx context.Context, options controller.
 }
 
 // Delete removes the storage asset that was created by Provision represented
-// by the given PV.
+// by the given PV. Does not delete the storage asset if it is in use by other PVs.
 func (p *hostPathProvisioner) Delete(ctx context.Context, volume *v1.PersistentVolume) error {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		klog.Fatalf("Failed to create config: %v", err)
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		klog.Fatalf("Failed to create client: %v", err)
+	}
+
+	pvs, err := clientset.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, pv := range pvs.Items {
+		if pv.Name == volume.Name {
+			continue
+		}
+
+		if pv.Spec.HostPath != nil && volume.Spec.HostPath != nil {
+			if pv.Spec.HostPath.Path == volume.Spec.HostPath.Path {
+				return nil
+			}
+		}
+	}
+
 	ann, ok := volume.Annotations["hostPathProvisionerIdentity"]
 	if !ok {
 		return errors.New("identity annotation not found on PV")
