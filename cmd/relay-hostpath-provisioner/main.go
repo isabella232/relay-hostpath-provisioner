@@ -8,7 +8,7 @@ import (
 	"path"
 	"syscall"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -18,6 +18,7 @@ import (
 
 const (
 	provisionerName = "relay.sh/hostpath"
+	defaultHostPath = "/tmp/hostpath-provisioner"
 )
 
 type hostPathProvisioner struct {
@@ -35,8 +36,14 @@ func NewHostPathProvisioner() controller.Provisioner {
 	if nodeName == "" {
 		klog.Fatal("env variable NODE_NAME must be set so that this provisioner can identify itself")
 	}
+
+	hostPath := os.Getenv("HOST_PATH")
+	if hostPath == "" {
+		hostPath = defaultHostPath
+	}
+
 	return &hostPathProvisioner{
-		pvDir:    "/tmp/hostpath-provisioner",
+		pvDir:    hostPath,
 		identity: nodeName,
 	}
 }
